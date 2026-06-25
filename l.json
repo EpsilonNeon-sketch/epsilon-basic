@@ -1,0 +1,16 @@
+[
+    {
+        "name": "JSON Formatter",
+        "description": "Beautify and minify JSON data instantly.",
+        "link": "https://tools.epsilon.dev/json-formatter",
+        "category": "Developer",
+        "size": "small"
+    },
+    {
+        "name": "Image Editor",
+        "description": "Full-featured online image editor with layers.",
+        "link": "https://tools.epsilon.dev/image-editor",
+        "category": "Design",
+        "size": "big"
+    }
+]
