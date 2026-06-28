@@ -1,8 +1,8 @@
 [
     {
-        "name": "JSON Formatter",
-        "description": "Beautify and minify JSON data instantly.",
-        "link": "https://tools.epsilon.dev/json-formatter",
+        "name": "Spreadsheet generator",
+        "description": "Mkae spreadsheets",
+        "link": "https://epsilon-basic.vercel.app/t/sprd.html",
         "category": "Developer",
         "size": "small"
     },
