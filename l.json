@@ -7,9 +7,9 @@
         "size": "small"
     },
     {
-        "name": "Image Editor",
-        "description": "Full-featured online image editor with layers.",
-        "link": "https://tools.epsilon.dev/image-editor",
+        "name": "Spread sheet",
+        "description": "Spread sheet generator.",
+        "link": "https://epsilon-basic.vercel.app/t/ex.html",
         "category": "Design",
         "size": "big"
     }
