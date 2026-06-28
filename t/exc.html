@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SheetForge — Spreadsheet Editor</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<script>
+tailwind.config={theme:{extend:{fontFamily:{outfit:['Outfit','sans-serif']},colors:{brand:{50:'#F5F3FF',100:'#EDE9FE',200:'#DDD6FE',300:'#C4B5FD',400:'#A78BFA',500:'#8B5CF6',600:'#7C3AED',700:'#6D28D9',800:'#5B21B6',900:'#4C1D95',950:'#2E1065'}}}}}
+</script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Outfit',sans-serif;overflow:hidden;height:100vh}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:#F5F3FF}
+::-webkit-scrollbar-thumb{background:#DDD6FE;border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:#C4B5FD}
+::-webkit-scrollbar-corner{background:#F5F3FF}
+
+#grid{table-layout:fixed;border-collapse:separate;border-spacing:0;font-family:'Outfit',sans-serif}
+#grid thead th{position:sticky;top:0;z-index:2;background:#F5F3FF;border-bottom:2px solid #DDD6FE;border-right:1px solid #E5E7EB;font-weight:600;font-size:11px;color:#7C3AED;text-align:center;user-select:none;padding:0;height:26px;line-height:26px;overflow:hidden}
+#grid thead th:first-child{z-index:4;left:0;background:#EDE9FE}
+#grid tbody td{border-bottom:1px solid #F3F4F6;border-right:1px solid #F3F4F6;padding:0 5px;font-size:13px;color:#1E1B4B;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;height:26px;line-height:26px;cursor:cell;vertical-align:middle}
+.row-hdr{position:sticky!important;left:0;z-index:3!important;background:#F5F3FF!important;font-weight:500;font-size:11px;color:#8B5CF6;text-align:center;user-select:none;cursor:pointer;min-width:46px;width:46px;border-right:1px solid #E5E7EB!important;border-bottom:1px solid #E5E7EB!important}
+.corner-cell{position:sticky;left:0;z-index:4;background:#EDE9FE;min-width:46px;width:46px}
+
+.cell-active{outline:2px solid #7C3AED;outline-offset:-1px;position:relative;z-index:1}
+.cell-in-range{background-color:rgba(139,92,246,.07)!important}
+.hdr-hl{background-color:#DDD6FE!important;color:#4C1D95!important}
+
+.cell-input{width:100%;height:100%;border:none;outline:none;padding:0 5px;font-family:'Outfit',sans-serif;font-size:inherit;background:#fff;box-sizing:border-box;color:inherit;font-weight:inherit;font-style:inherit;text-align:inherit}
+
+.col-resize{position:absolute;right:-3px;top:0;bottom:0;width:6px;cursor:col-resize;z-index:5}
+.col-resize:hover,.col-resize.active{background-color:#7C3AED;border-radius:1px}
+
+.sheet-tab{display:flex;align-items:center;gap:4px;padding:4px 14px;border-radius:6px 6px 0 0;font-size:12px;font-weight:500;cursor:pointer;border:1px solid transparent;border-bottom:none;transition:all .15s;user-select:none;background:#F5F3FF;color:#6B7280;white-space:nowrap}
+.sheet-tab:hover{background:#EDE9FE;color:#4C1D95}
+.sheet-tab.active{background:#fff;color:#4C1D95;font-weight:700;border-color:#E5E7EB;border-bottom-color:#fff;margin-bottom:-1px;position:relative;z-index:1}
+.tab-close{display:none;padding:1px;border:none;background:none;cursor:pointer;color:#9CA3AF;border-radius:3px;line-height:1;align-items:center;justify-content:center}
+.sheet-tab:hover .tab-close{display:flex}
+.tab-close:hover{color:#DC2626;background:#FEE2E2}
+.tab-rename{width:80px;padding:0 4px;border:1.5px solid #7C3AED;border-radius:3px;font-size:12px;font-family:'Outfit',sans-serif;outline:none;background:#fff}
+
+.tb{display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:6px;cursor:pointer;border:none;background:transparent;color:#4C1D95;transition:all .12s;flex-shrink:0}
+.tb:hover{background:#EDE9FE}
+.tb.on{background:#DDD6FE;color:#5B21B6}
+.tb.pr{background:#7C3AED;color:#fff;width:auto;padding:0 12px;gap:5px}
+.tb.pr:hover{background:#6D28D9}
+.sep{width:1px;height:24px;background:#E5E7EB;flex-shrink:0;margin:0 2px}
+
+.pi{width:48px;height:30px;border:1px solid #E5E7EB;border-radius:6px;font-size:12px;font-family:'Outfit',sans-serif;text-align:center;outline:none;color:#1E1B4B;background:#fff}
+.pi:focus{border-color:#7C3AED;box-shadow:0 0 0 2px rgba(124,58,237,.1)}
+
+input[type=color]{width:30px;height:30px;border:2px solid #E5E7EB;border-radius:6px;cursor:pointer;padding:2px;background:#fff;flex-shrink:0}
+input[type=color]::-webkit-color-swatch-wrapper{padding:0}
+input[type=color]::-webkit-color-swatch{border:none;border-radius:3px}
+
+@keyframes tIn{from{transform:translateX(120%);opacity:0}to{transform:translateX(0);opacity:1}}
+@keyframes tOut{from{transform:translateX(0);opacity:1}to{transform:translateX(120%);opacity:0}}
+.t-in{animation:tIn .3s ease forwards}.t-out{animation:tOut .3s ease forwards}
+@media(prefers-reduced-motion:reduce){.t-in,.t-out{animation:none!important}.sheet-tab,.tb{transition:none!important}}
+</style>
+</head>
+<body class="bg-brand-50 font-outfit text-brand-950 flex flex-col">
+
+<!-- Toolbar -->
+<header class="h-11 bg-white border-b border-gray-200 flex items-center px-3 gap-1 flex-shrink-0 z-10">
+    <div class="flex items-center gap-2 mr-2">
+        <div class="w-7 h-7 bg-gradient-to-br from-brand-500 to-brand-700 rounded-md flex items-center justify-center shadow-sm shadow-brand-200">
+            <i data-lucide="table-2" class="w-3.5 h-3.5 text-white"></i>
+        </div>
+        <span class="font-bold text-brand-900 text-sm tracking-tight hidden sm:inline">SheetForge</span>
+    </div>
+    <div class="sep"></div>
+    <button id="btnBold" class="tb" onclick="toggleFmt('bold')" title="Bold (Ctrl+B)"><i data-lucide="bold" class="w-4 h-4"></i></button>
+    <button id="btnItalic" class="tb" onclick="toggleFmt('italic')" title="Italic (Ctrl+I)"><i data-lucide="italic" class="w-4 h-4"></i></button>
+    <input id="fsInput" type="number" class="pi" value="13" min="8" max="72" onchange="applyFmt('fontSize',Math.max(8,+this.value))" title="Font size">
+    <input id="tcInput" type="color" value="#1E1B4B" onchange="applyFmt('color',this.value)" title="Text color">
+    <input id="bgInput" type="color" value="#ffffff" onchange="applyFmt('bg',this.value)" title="Background color">
+    <div class="sep"></div>
+    <button id="btnAlignLeft" class="tb" onclick="applyFmt('align','left')" title="Align left"><i data-lucide="align-left" class="w-4 h-4"></i></button>
+    <button id="btnAlignCenter" class="tb" onclick="applyFmt('align','center')" title="Align center"><i data-lucide="align-center" class="w-4 h-4"></i></button>
+    <button id="btnAlignRight" class="tb" onclick="applyFmt('align','right')" title="Align right"><i data-lucide="align-right" class="w-4 h-4"></i></button>
+    <div class="sep"></div>
+    <button class="tb" onclick="clearFmt()" title="Clear formatting"><i data-lucide="eraser" class="w-4 h-4"></i></button>
+    <div class="flex-1"></div>
+    <button class="tb" onclick="newSheet()" title="New spreadsheet"><i data-lucide="file-plus" class="w-4 h-4"></i></button>
+    <button class="tb" onclick="exportJSON()" title="Export JSON"><i data-lucide="download" class="w-4 h-4"></i></button>
+    <button class="tb" onclick="document.getElementById('impF').click()" title="Import JSON"><i data-lucide="upload" class="w-4 h-4"></i></button>
+</header>
+
+<!-- Formula Bar -->
+<div class="h-9 bg-white border-b border-gray-200 flex items-center px-3 gap-2 flex-shrink-0 z-10">
+    <input id="cellRef" class="w-16 text-center font-semibold text-xs bg-brand-50 rounded px-1 py-1 border border-brand-100 outline-none text-brand-800" value="A1" spellcheck="false">
+    <span class="text-brand-400 text-xs font-bold select-none">fx</span>
+    <input id="fxInput" class="flex-1 text-xs px-2 py-1 rounded border border-gray-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 outline-none text-brand-900" spellcheck="false">
+</div>
+
+<!-- Main Area -->
+<div class="flex-1 flex flex-col overflow-hidden">
+    <div id="gridWrap" class="flex-1 overflow-auto bg-white relative">
+        <table id="grid"><thead><tr id="hRow"></tr></thead><tbody id="gBody"></tbody></table>
+    </div>
+    <div class="flex-shrink-0 border-t border-gray-200">
+        <div id="sheetBar" class="flex items-center px-2 h-8 bg-white gap-1 overflow-x-auto"></div>
+        <div id="statusBar" class="flex items-center px-4 h-6 bg-brand-50 border-t border-gray-100 text-[11px] text-gray-500 gap-6 flex-shrink-0"></div>
+    </div>
+</div>
+
+<!-- Toasts -->
+<div id="toasts" class="fixed top-14 right-4 z-[10000] flex flex-col gap-2 pointer-events-none"></div>
+<input type="file" id="impF" accept=".json" style="display:none" onchange="importJSON(event)">
+
+<script>
+/* ========== CONSTANTS ========== */
+const R=100,C=26,DCW=100,DRH=26;
+const CD={value:'',formula:'',dv:'',bold:false,italic:false,color:'#1E1B4B',bg:'',fontSize:13,align:'left'};
+
+/* ========== STATE ========== */
+let S={sheets:[],as:0,ac:{r:0,c:0},ss:{r:0,c:0},se:{r:0,c:0},editing:false,esrc:null,eVal:''};
+let crs={on:false,c:-1,sx:0,sw:0};
+let celE=[],colH=[],rowH=[];
+
+/* ========== UTILS ========== */
+const cn=c=>String.fromCharCode(65+c);
+const pc=s=>s.charCodeAt(0)-65;
+const gs=()=>S.sheets[S.as];
+const gc=(r,c)=>{const s=gs();return s.cells[`${r}-${c}`]||null};
+const ge=(r,c)=>celE[r]?.[c]||null;
+const gdv=(r,c)=>{const cl=gc(r,c);if(!cl)return'';if(cl.formula)return cl.dv||'#ERROR';return cl.value||''};
+
+function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+
+/* ========== FORMULA ENGINE ========== */
+function evalCell(r,c,ev){
+    const s=gs(),k=`${r}-${c}`,cl=s.cells[k];
+    if(!cl)return'';if(!cl.formula){cl.dv=cl.value||'';return cl.dv}
+    if(!ev)ev=new Set();
+    if(ev.has(k)){cl.dv='#CIRCULAR';return'#CIRCULAR'}
+    ev.add(k);
+    let ex=cl.formula.substring(1).trim();
+    // Replace function calls
+    ex=ex.replace(/(SUM|AVERAGE|MIN|MAX|COUNT)\(([A-Z])(\d+):([A-Z])(\d+)\)/gi,(m,fn,c1,r1,c2,r2)=>{
+        const v=rangeVals(pc(c1.toUpperCase()),+r1-1,pc(c2.toUpperCase()),+r2-1,ev);
+        const n=v.map(x=>parseFloat(x)).filter(x=>!isNaN(x));
+        switch(fn.toUpperCase()){
+            case'SUM':return n.reduce((a,b)=>a+b,0);
+            case'AVERAGE':return n.length?n.reduce((a,b)=>a+b,0)/n.length:0;
+            case'MIN':return n.length?Math.min(...n):0;
+            case'MAX':return n.length?Math.max(...n):0;
+            case'COUNT':return n.length;
+            default:return 0;
+        }
+    });
+    // Replace cell references
+    ex=ex.replace(/\b([A-Z])(\d+)\b/gi,(m,col,row)=>{
+        const v=evalCell(+row-1,pc(col.toUpperCase()),new Set(ev));
+        const n=parseFloat(v);return isNaN(n)?0:n;
+    });
+    ev.delete(k);
+    try{const res=Function('"use strict";return('+ex+')')();
+        cl.dv=typeof res==='number'?(Number.isInteger(res)?res.toString():parseFloat(res.toFixed(6)).toString()):String(res);
+    }catch(e){cl.dv='#ERROR'}
+    return cl.dv;
+}
+function rangeVals(c1,r1,c2,r2,ev){
+    const v=[],mr=Math.min(r1,r2),xr=Math.max(r1,r2),mc=Math.min(c1,c2),xc=Math.max(c1,c2);
+    for(let r=mr;r<=xr;r++)for(let c=mc;c<=xc;c++)v.push(evalCell(r,c,ev));
+    return v;
+}
+function reEval(){const s=gs();for(const k in s.cells)if(s.cells[k].formula){const[r,c]=k.split('-').map(Number);evalCell(r,c)}}
+
+/* ========== GRID BUILD ========== */
+function buildGrid(){
+    const hr=document.getElementById('hRow'),gb=document.getElementById('gBody');
+    const s=gs();
+    let hh='<th class="corner-cell"></th>';
+    for(let c=0;c<C;c++){const w=s.colWidths?.[c]||DCW;hh+=`<th data-c="${c}" style="width:${w}px;min-width:${w}px;max-width:${w}px;position:relative"><span>${cn(c)}</span><div class="col-resize" data-c="${c}"></div></th>`}
+    hr.innerHTML=hh;
+    let bh='';
+    for(let r=0;r<R;r++){bh+=`<tr><td class="row-hdr" data-r="${r}">${r+1}</td>`;for(let c=0;c<C;c++)bh+=`<td data-r="${r}" data-c="${c}"></td>`;bh+='</tr>'}
+    gb.innerHTML=bh;
+    // Cache elements
+    celE=[];colH=[];rowH=[];
+    for(let c=0;c<C;c++)colH[c]=hr.children[c+1];
+    const rows=gb.children;
+    for(let r=0;r<R;r++){rowH[r]=rows[r].children[0];celE[r]=[];for(let c=0;c<C;c++)celE[r][c]=rows[r].children[c+1]}
+}
+
+/* ========== CELL RENDERING ========== */
+function refreshCell(r,c){
+    const td=ge(r,c);if(!td)return;
+    // Reset inline styles
+    td.style.cssText='';td.textContent='';
+    const cl=gc(r,c);if(!cl)return;
+    if(cl.bold)td.style.fontWeight='700';
+    if(cl.italic)td.style.fontStyle='italic';
+    if(cl.color&&cl.color!==CD.color)td.style.color=cl.color;
+    if(cl.bg)td.style.backgroundColor=cl.bg;
+    if(cl.fontSize&&cl.fontSize!==CD.fontSize)td.style.fontSize=cl.fontSize+'px';
+    if(cl.align&&cl.align!==CD.align)td.style.textAlign=cl.align;
+    td.textContent=cl.dv||cl.value||'';
+}
+function refreshAll(){for(let r=0;r<R;r++)for(let c=0;c<C;c++)refreshCell(r,c)}
+
+/* ========== SELECTION ========== */
+function selRange(){return{r1:Math.min(S.ss.r,S.se.r),r2:Math.max(S.ss.r,S.se.r),c1:Math.min(S.ss.c,S.se.c),c2:Math.max(S.ss.c,S.se.c)}}
+function inSel(r,c){const s=selRange();return r>=s.r1&&r<=s.r2&&c>=s.c1&&c<=s.c2}
+
+function updSel(){
+    document.querySelectorAll('.cell-active,.cell-in-range,.hdr-hl').forEach(e=>{e.classList.remove('cell-active','cell-in-range','hdr-hl')});
+    const s=selRange();
+    for(let r=s.r1;r<=s.r2;r++)for(let c=s.c1;c<=s.c2;c++){const td=ge(r,c);if(td)td.classList.add('cell-in-range')}
+    const ad=ge(S.ac.r,S.ac.c);if(ad)ad.classList.add('cell-active');
+    for(let c=s.c1;c<=s.c2;c++)if(colH[c])colH[c].classList.add('hdr-hl');
+    for(let r=s.r1;r<=s.r2;r++)if(rowH[r])rowH[r].classList.add('hdr-hl');
+}
+
+/* ========== FORMULA BAR ========== */
+function updFB(){
+    const s=selRange();
+    const ref=document.getElementById('cellRef');
+    ref.value=(s.r1===s.r2&&s.c1===s.c2)?cn(S.ac.c)+(S.ac.r+1):cn(s.c1)+(s.r1+1)+':'+cn(s.c2)+(s.r2+1);
+    if(!S.editing){const cl=gc(S.ac.r,S.ac.c);document.getElementById('fxInput').value=cl?.formula||cl?.value||''}
+}
+
+/* ========== FORMAT BAR ========== */
+function updFmt(){
+    const cl=gc(S.ac.r,S.ac.c);
+    document.getElementById('btnBold').classList.toggle('on',!!cl?.bold);
+    document.getElementById('btnItalic').classList.toggle('on',!!cl?.italic);
+    document.getElementById('fsInput').value=cl?.fontSize||13;
+    document.getElementById('tcInput').value=cl?.color||'#1E1B4B';
+    document.getElementById('bgInput').value=cl?.bg||'#ffffff';
+    ['Left','Center','Right'].forEach(a=>{document.getElementById('btnAlign'+a).classList.toggle('on',(cl?.align||'left')===a.toLowerCase())});
+}
+
+/* ========== STATUS BAR ========== */
+function updStatus(){
+    const s=selRange(),cnt=(s.r2-s.r1+1)*(s.c2-s.c1+1);
+    const vals=[];for(let r=s.r1;r<=s.r2;r++)for(let c=s.c1;c<=s.c2;c++)vals.push(gdv(r,c));
+    const nums=vals.map(v=>parseFloat(v)).filter(v=>!isNaN(v));
+    const sum=nums.reduce((a,b)=>a+b,0);
+    const avg=nums.length?sum/nums.length:0;
+    document.getElementById('statusBar').innerHTML=
+        `<span>Cells: <b>${cnt}</b></span>`+
+        (nums.length?`<span>Sum: <b>${Number.isInteger(sum)?sum:sum.toFixed(2)}</b></span><span>Average: <b>${avg.toFixed(2)}</b></span><span>Numbers: <b>${nums.length}</b></span>`:'');
+}
+
+/* ========== EDITING ========== */
+function startEdit(src,initVal){
+    S.editing=true;S.esrc=src;S.eVal=initVal||'';
+    document.getElementById('fxInput').value=S.eVal;
+    if(src==='cell'){
+        const td=ge(S.ac.r,S.ac.c);if(!td)return;
+        td.textContent='';
+        const inp=document.createElement('input');inp.className='cell-input';inp.value=S.eVal;
+        const cl=gc(S.ac.r,S.ac.c);
+        if(cl){if(cl.bold)inp.style.fontWeight='700';if(cl.italic)inp.style.fontStyle='italic';if(cl.color)inp.style.color=cl.color;if(cl.fontSize)inp.style.fontSize=cl.fontSize+'px';if(cl.align)inp.style.textAlign=cl.align}
+        td.appendChild(inp);inp.focus();inp.setSelectionRange(inp.value.length,inp.value.length);
+        inp.addEventListener('input',()=>{S.eVal=inp.value;document.getElementById('fxInput').value=inp.value});
+    }else{
+        const td=ge(S.ac.r,S.ac.c);if(td)td.textContent=S.eVal;
+    }
+}
+function confirmEdit(dir){
+    const inp=S.esrc==='cell'?document.querySelector('.cell-input'):document.getElementById('fxInput');
+    const val=inp?inp.value:S.eVal;
+    const{r,c}=S.ac;
+    if(val.startsWith('=')){
+        if(!gs().cells[`${r}-${c}`])gs().cells[`${r}-${c}`]={...CD};
+        gs().cells[`${r}-${c}`].formula=val;gs().cells[`${r}-${c}`].value='';
+    }else{
+        if(!val&&!gs().cells[`${r}-${c}`]){}
+        else if(!val){delete gs().cells[`${r}-${c}`]}
+        else{if(!gs().cells[`${r}-${c}`])gs().cells[`${r}-${c}`]={...CD};gs().cells[`${r}-${c}`].value=val;gs().cells[`${r}-${c}`].formula=''}
+    }
+    endEdit();reEval();refreshAll();updSel();updFB();save();
+    if(dir&&dir!=='none'){const d={up:[-1,0],down:[1,0],left:[0,-1],right:[0,1]};const[dr,dc]=d[dir]||[0,0];moveAc(dr,dc,false)}
+}
+function cancelEdit(){endEdit();updFB()}
+function endEdit(){S.editing=false;S.esrc=null;S.eVal='';const inp=document.querySelector('.cell-input');if(inp){const td=inp.parentElement;inp.remove();refreshCell(+td.dataset.r,+td.dataset.c)}}
+function syncEdit(v){S.eVal=v;if(S.esrc==='cell'){const inp=document.querySelector('.cell-input');if(inp)inp.value=v}else{const td=ge(S.ac.r,S.ac.c);if(td)td.textContent=v}}
+
+/* ========== FORMATTING ========== */
+function toggleFmt(p){const cl=gc(S.ac.r,S.ac.c);applyFmt(p,!(cl?.[p]||false))}
+function applyFmt(p,v){
+    const s=selRange(),sh=gs();
+    for(let r=s.r1;r<=s.r2;r++)for(let c=s.c1;c<=s.c2;c++){
+        const k=`${r}-${c}`;if(!sh.cells[k])sh.cells[k]={...CD};sh.cells[k][p]=v;
+    }
+    refreshAll();updSel();updFmt();save();
+}
+function clearFmt(){
+    const s=selRange(),sh=gs();
+    for(let r=s.r1;r<=s.r2;r++)for(let c=s.c1;c<=s.c2;c++){
+        const k=`${r}-${c}`;if(!sh.cells[k])continue;
+        sh.cells[k].bold=CD.bold;sh.cells[k].italic=CD.italic;sh.cells[k].color=CD.color;sh.cells[k].bg=CD.bg;sh.cells[k].fontSize=CD.fontSize;sh.cells[k].align=CD.align;
+    }
+    refreshAll();updSel();updFmt();save();toast('Formatting cleared');
+}
+
+/* ========== CELL OPERATIONS ========== */
+function setCellVal(r,c,v){const s=gs(),k=`${r}-${c}`;if(!v&&!s.cells[k])return;if(!v){delete s.cells[k];return}if(!s.cells[k])s.cells[k]={...CD};s.cells[k].value=String(v);s.cells[k].formula='';s.cells[k].dv=String(v)}
+function clearCells(){
+    const s=selRange(),sh=gs();
+    for(let r=s.r1;r<=s.r2;r++)for(let c=s.c1;c<=s.c2;c++){const k=`${r}-${c}`;if(sh.cells[k]){sh.cells[k].value='';sh.cells[k].formula='';sh.cells[k].dv=''}}
+    reEval();refreshAll();updSel();updFB();save();
+}
+
+/* ========== NAVIGATION ========== */
+function moveAc(dr,dc,ext){
+    let{r,c}=S.ac;r=Math.max(0,Math.min(R-1,r+dr));c=Math.max(0,Math.min(C-1,c+dc));
+    S.ac={r,c};if(ext)S.se={r,c};else{S.ss={r,c};S.se={r,c}}
+    updSel();updFB();updFmt();updStatus();scrollInto(r,c);
+}
+function scrollInto(r,c){const td=ge(r,c);if(td)td.scrollIntoView({block:'nearest',inline:'nearest'})}
+
+/* ========== SHEETS ========== */
+function addSheet(){
+    if(S.editing)cancelEdit();
+    const id='sh'+Date.now();
+    S.sheets.push({id,name:'Sheet '+(S.sheets.length+1),cells:{},colWidths:{}});
+    S.as=S.sheets.length-1;S.ac={r:0,c:0};S.ss={r:0,c:0};S.se={r:0,c:0};
+    buildGrid();reEval();refreshAll();updSel();updFB();updFmt();updStatus();renderTabs();save();toast('Sheet added');
+}
+function switchSheet(i){
+    if(S.editing)cancelEdit();if(i===S.as)return;
+    S.as=i;S.ac={r:0,c:0};S.ss={r:0,c:0};S.se={r:0,c:0};
+    buildGrid();reEval();refreshAll();updSel();updFB();updFmt();updStatus();renderTabs();
+}
+function delSheet(i){
+    if(S.sheets.length<=1){toast('Cannot delete last sheet','err');return}
+    S.sheets.splice(i,1);if(S.as>=S.sheets.length)S.as=S.sheets.length-1;
+    S.ac={r:0,c:0};S.ss={r:0,c:0};S.se={r:0,c:0};
+    buildGrid();reEval();refreshAll();updSel();updFB();updFmt();updStatus();renderTabs();save();toast('Sheet deleted');
+}
+function renameSheet(i){
+    const tab=document.querySelector(`.sheet-tab[data-i="${i}"]`);if(!tab)return;
+    const sp=tab.querySelector('.tn');if(!sp)return;
+    const inp=document.createElement('input');inp.className='tab-rename';inp.value=S.sheets[i].name;
+    sp.replaceWith(inp);inp.focus();inp.select();
+    const done=()=>{const n=inp.value.trim()||S.sheets[i].name;S.sheets[i].name=n;renderTabs();save()};
+    inp.addEventListener('blur',done);
+    inp.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();inp.blur()}if(e.key==='Escape'){inp.value=S.sheets[i].name;inp.blur()}});
+}
+function renderTabs(){
+    const c=document.getElementById('sheetBar');
+    let h=`<button class="tb" style="width:24px;height:24px;flex-shrink:0" onclick="addSheet()" title="Add sheet"><i data-lucide="plus" class="w-3.5 h-3.5"></i></button>`;
+    S.sheets.forEach((s,i)=>{
+        h+=`<div class="sheet-tab${i===S.as?' active':''}" data-i="${i}" onclick="switchSheet(${i})" ondblclick="event.stopPropagation();renameSheet(${i})"><span class="tn">${esc(s.name)}</span>${S.sheets.length>1?`<button class="tab-close" onclick="event.stopPropagation();delSheet(${i})" title="Delete"><i data-lucide="x" class="w-3 h-3"></i></button>`:''}</div>`;
+    });
+    c.innerHTML=h;lucide.createIcons({nodes:[c]});
+}
+
+/* ========== COLUMN RESIZE ========== */
+function startCR(el,e){
+    crs.on=true;crs.c=+el.dataset.c;crs.sx=e.clientX;crs.sw=gs().colWidths?.[crs.c]||DCW;
+    el.classList.add('active');e.preventDefault();
+}
+
+/* ========== CLIPBOARD ========== */
+function copySel(){
+    const s=selRange();let txt='';
+    for(let r=s.r1;r<=s.r2;r++){for(let c=s.c1;c<=s.c2;c++){txt+=gdv(r,c);if(c<s.c2)txt+='\t'}if(r<s.r2)txt+='\n'}
+    navigator.clipboard.writeText(txt).catch(()=>{});toast('Copied');
+}
+async function pasteSel(){
+    try{
+        const txt=await navigator.clipboard.readText();if(!txt)return;
+        const lines=txt.split('\n'),{r:sr,c:sc}=S.ac;
+        for(let i=0;i<lines.length;i++){const cells=lines[i].split('\t');for(let j=0;j<cells.length;j++){const r=sr+i,c=sc+j;if(r>=R||c>=C)break;setCellVal(r,c,cells[j])}}
+        reEval();refreshAll();updSel();save();toast('Pasted');
+    }catch(e){toast('Paste failed','err')}
+}
+
+/* ========== STORAGE ========== */
+let _st;
+function save(){clearTimeout(_st);_st=setTimeout(()=>{try{localStorage.setItem('sf_sheet',JSON.stringify({sheets:S.sheets,as:S.as}))}catch(e){}},300)}
+function load(){
+    try{const d=JSON.parse(localStorage.getItem('sf_sheet'));if(d?.sheets?.length){S.sheets=d.sheets;S.as=d.as||0;if(S.as>=S.sheets.length)S.as=0;return true}}catch(e){}return false;
+}
+
+/* ========== EXPORT / IMPORT ========== */
+function exportJSON(){
+    const d=JSON.stringify({sheets:S.sheets},null,2);
+    const b=new Blob([d],{type:'application/json'}),a=document.createElement('a');
+    a.href=URL.createObjectURL(b);a.download='sheetforge-spreadsheet.json';a.click();URL.revokeObjectURL(a.href);toast('Exported');
+}
+function importJSON(ev){
+    const f=ev.target.files[0];if(!f)return;
+    const rd=new FileReader();rd.onload=e=>{
+        try{const d=JSON.parse(e.target.result);if(d.sheets&&Array.isArray(d.sheets)){S.sheets=d.sheets;S.as=0;S.ac={r:0,c:0};S.ss={r:0,c:0};S.se={r:0,c:0};buildGrid();reEval();refreshAll();updSel();updFB();updFmt();updStatus();renderTabs();save();toast('Imported')}else toast('Invalid file','err')}
+        catch(err){toast('Parse error','err')}
+    };rd.readAsText(f);ev.target.value='';
+}
+function newSheet(){if(S.editing)cancelEdit();S.sheets=[createSample()];S.as=0;S.ac={r:0,c:0};S.ss={r:0,c:0};S.se={r:0,c:0};buildGrid();reEval();refreshAll();updSel();updFB();updFmt();updStatus();renderTabs();save();toast('New spreadsheet')}
+
+/* ========== TOAST ========== */
+function toast(msg,type='ok'){
+    const c=document.getElementById('toasts'),t=document.createElement('div');
+    const bg=type==='ok'?'bg-brand-600':type==='err'?'bg-red-600':'bg-gray-800';
+    t.className=`t-in ${bg} text-white px-4 py-2 rounded-xl shadow-xl text-xs font-medium flex items-center gap-2 pointer-events-auto`;
+    const ic=type==='ok'?'check-circle':type==='err'?'alert-circle':'info';
+    t.innerHTML=`<i data-lucide="${ic}" class="w-3.5 h-3.5"></i>${esc(msg)}`;
+    c.appendChild(t);lucide.createIcons({nodes:[t]});
+    setTimeout(()=>{t.classList.replace('t-in','t-out');setTimeout(()=>t.remove(),300)},2200);
+}
+
+/* ========== SAMPLE DATA ========== */
+function createSample(){
+    const sh={id:'sh1',name:'Report',cells:{},colWidths:{}};
+    const s=(r,c,v,f,o={})=>{const k=`${r}-${c}`;sh.cells[k]={value:f?'':String(v),formula:f||'',dv:'',...CD,...o}};
+    // Title
+    s(0,0,'Quarterly Report','','',{bold:true,fontSize:18,color:'#4C1D95'});
+    // Headers
+    ['Item','Q1','Q2','Q3','Q4','Total'].forEach((h,i)=>s(2,i,h,'',{bold:true,bg:'#EDE9FE'}));
+    // Revenue
+    s(3,0,'Revenue','','',{bold:true});s(3,1,45000);s(3,2,52000);s(3,3,48000);s(3,4,61000);
+    s(3,5,'','=SUM(B3:E3)',{bold:true,bg:'#F5F3FF'});
+    // Expenses
+    s(4,0,'Expenses','','',{bold:true});s(4,1,32000);s(4,2,35000);s(4,3,31000);s(4,4,38000);
+    s(4,5,'','=SUM(B4:E4)',{bold:true,bg:'#F5F3FF'});
+    // Profit
+    s(5,0,'Profit','','',{bold:true,color:'#059669'});
+    s(5,1,'','=B3-B4');s(5,2,'','=C3-C4');s(5,3,'','=D3-D4');s(5,4,'','=E3-E4');
+    s(5,5,'','=SUM(B5:E5)',{bold:true,bg:'#F5F3FF',color:'#059669'});
+    // Growth
+    s(6,0,'Growth','','',{color:'#7C3AED'});
+    s(6,2,'','=(C3-B3)/B3');s(6,3,'','=(D3-C3)/C3');s(6,4,'','=(E3-D3)/D3');
+    // Margin
+    s(7,0,'Margin','','',{color:'#7C3AED'});
+    s(7,1,'','=B5/B3');s(7,2,'','=C5/C3');s(7,3,'','=D5/D3');s(7,4,'','=E5/E3');
+    // Summary
+    s(9,0,'Summary','','',{bold:true,fontSize:14,color:'#4C1D95'});
+    s(10,0,'Total Revenue');s(10,1,'','=F3');
+    s(11,0,'Total Expenses');s(11,1,'','=F4');
+    s(12,0,'Net Profit');s(12,1,'','=F5',{bold:true,color:'#059669'});
+    s(13,0,'Avg Profit/Qtr');s(13,1,'','=AVERAGE(B5:E5)');
+    // Department table
+    s(2,8,'Department','','',{bold:true,bg:'#EDE9FE'});s(2,9,'Headcount','','',{bold:true,bg:'#EDE9FE'});s(2,10,'Budget','','',{bold:true,bg:'#EDE9FE'});
+    s(3,8,'Engineering');s(3,9,25);s(3,10,500000);
+    s(4,8,'Marketing');s(4,9,12);s(4,10,200000);
+    s(5,8,'Sales');s(5,9,18);s(5,10,300000);
+    s(6,8,'Operations');s(6,9,8);s(6,10,150000);
+    s(7,8,'Total','','',{bold:true,bg:'#F5F3FF'});s(7,9,'','=SUM(I3:I6)',{bold:true,bg:'#F5F3FF'});s(7,10,'','=SUM(J3:J6)',{bold:true,bg:'#F5F3FF'});
+    sh.colWidths[0]=120;sh.colWidths[5]=90;sh.colWidths[8]=100;sh.colWidths[10]=100;
+    return sh;
+}
+
+/* ========== EVENT HANDLERS ========== */
+function initEvents(){
+    const gw=document.getElementById('gridWrap');
+
+    // Grid mousedown
+    gw.addEventListener('mousedown',e=>{
+        if(S.editing&&S.esrc==='cell'){const inp=document.querySelector('.cell-input');if(inp&&!inp.contains(e.target))confirmEdit('none');return}
+        // Column resize
+        const rez=e.target.closest('.col-resize');if(rez){startCR(rez,e);return}
+        // Column header
+        const ch=e.target.closest('th[data-c]');if(ch){const c=+ch.dataset.c;S.ac={r:0,c};S.ss={r:0,c};S.se={r:R-1,c};updSel();updFB();updFmt();updStatus();return}
+        // Row header
+        const rh=e.target.closest('.row-hdr');if(rh){const r=+rh.dataset.r;S.ac={r,c:0};S.ss={r,c:0};S.se={r,c:C-1};updSel();updFB();updFmt();updStatus();return}
+        // Cell
+        const td=e.target.closest('td[data-r]');if(td){
+            const r=+td.dataset.r,c=+td.dataset.c;
+            if(e.shiftKey){S.se={r,c}}else{S.ac={r,c};S.ss={r,c};S.se={r,c}}
+            S._selecting=true;updSel();updFB();updFmt();updStatus();
+        }
+    });
+
+    // Mouse move (selection + resize)
+    document.addEventListener('mousemove',e=>{
+        if(S._selecting){
+            const el=document.elementFromPoint(e.clientX,e.clientY);
+            if(el?.dataset?.r!==undefined){
+                const r=+el.dataset.r,c=+el.dataset.c;
+                if(S.se.r!==r||S.se.c!==c){S.se={r,c};updSel();updFB();updStatus()}
+            }
+        }
+        if(crs.on){
+            const dx=e.clientX-crs.sx,nw=Math.max(40,crs.sw+dx);
+            const th=colH[crs.c];if(th){th.style.width=nw+'px';th.style.minWidth=nw+'px';th.style.maxWidth=nw+'px'}
+        }
+    });
+
+    // Mouse up
+    document.addEventListener('mouseup',()=>{
+        if(S._selecting)S._selecting=false;
+        if(crs.on){crs.on=false;document.querySelectorAll('.col-resize.active').forEach(e=>e.classList.remove('active'));const sh=gs();if(!sh.colWidths)sh.colWidths={};sh.colWidths[crs.c]=Math.max(40,crs.sw+(/* use last known dx - approximate */0));const th=colH[crs.c];if(th)sh.colWidths[crs.c]=parseInt(th.style.width);save()}
+    });
+
+    // Double-click to edit
+    gw.addEventListener('dblclick',e=>{
+        const td=e.target.closest('td[data-r]');if(!td||S.editing)return;
+        const r=+td.dataset.r,c=+td.dataset.c;S.ac={r,c};S.ss={r,c};S.se={r,c};
+        const cl=gc(r,c);startEdit('cell',cl?.formula||cl?.value||'');updSel();updFB();updFmt();updStatus();
+    });
+
+    // Formula bar input
+    const fxi=document.getElementById('fxInput');
+    fxi.addEventListener('focus',()=>{if(!S.editing)startEdit('bar',fxi.value)});
+    fxi.addEventListener('input',()=>syncEdit(fxi.value));
+    fxi.addEventListener('keydown',e=>{
+        if(e.key==='Enter'){e.preventDefault();confirmEdit('none')}
+        if(e.key==='Escape'){e.preventDefault();cancelEdit()}
+    });
+
+    // Cell reference input
+    const cr=document.getElementById('cellRef');
+    cr.addEventListener('focus',()=>cr.select());
+    cr.addEventListener('keydown',e=>{
+        if(e.key==='Enter'){
+            e.preventDefault();const m=cr.value.trim().toUpperCase().match(/^([A-Z])(\d+)$/);
+            if(m){const c=pc(m[1]),r=+m[2]-1;if(r>=0&&r<R&&c>=0&&c<C){S.ac={r,c};S.ss={r,c};S.se={r,c};updSel();updFB();updFmt();updStatus();scrollInto(r,c)}}
+            cr.blur();
+        }
+        if(e.key==='Escape'){updFB();cr.blur()}
+    });
+
+    // Keyboard
+    document.addEventListener('keydown',e=>{
+        if(S.editing)return; // Edit mode handled by input elements
+        if(e.key==='ArrowUp'){e.preventDefault();moveAc(-1,0,e.shiftKey)}
+        else if(e.key==='ArrowDown'){e.preventDefault();moveAc(1,0,e.shiftKey)}
+        else if(e.key==='ArrowLeft'){e.preventDefault();moveAc(0,-1,e.shiftKey)}
+        else if(e.key==='ArrowRight'){e.preventDefault();moveAc(0,1,e.shiftKey)}
+        else if(e.key==='Tab'){e.preventDefault();moveAc(0,e.shiftKey?-1:1,false)}
+        else if(e.key==='Enter'){e.preventDefault();moveAc(e.shiftKey?-1:1,0,false)}
+        else if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();clearCells()}
+        else if(e.key==='F2'){e.preventDefault();const cl=gc(S.ac.r,S.ac.c);startEdit('cell',cl?.formula||cl?.value||'')}
+        else if(e.key==='b'&&(e.ctrlKey||e.metaKey)){e.preventDefault();toggleFmt('bold')}
+        else if(e.key==='i'&&(e.ctrlKey||e.metaKey)){e.preventDefault();toggleFmt('italic')}
+        else if(e.key==='c'&&(e.ctrlKey||e.metaKey)){e.preventDefault();copySel()}
+        else if(e.key==='v'&&(e.ctrlKey||e.metaKey)){e.preventDefault();pasteSel()}
+        else if(e.key==='s'&&(e.ctrlKey||e.metaKey)){e.preventDefault();save();toast('Saved')}
+        else if(e.key.length===1&&!e.ctrlKey&&!e.metaKey&&!e.altKey){startEdit('cell',e.key)}
+    });
+
+    // Handle column resize end properly
+    let _crsStartW;
+    const origStartCR=startCR;
+    // Override to track width properly
+    gw.removeEventListener('mousedown',null);
+}
+
+/* ========== FIX COLUMN RESIZE ========== */
+// Patch: store start width properly
+document.addEventListener('mousedown',e=>{
+    const rez=e.target.closest('.col-resize');
+    if(rez){
+        crs.on=true;crs.c=+rez.dataset.c;crs.sx=e.clientX;
+        crs.sw=parseInt(colH[crs.c]?.style.width)||gs().colWidths?.[crs.c]||DCW;
+        rez.classList.add('active');e.preventDefault();e.stopPropagation();
+    }
+},true);
+
+document.addEventListener('mousemove',e=>{
+    if(!crs.on)return;
+    const dx=e.clientX-crs.sx,nw=Math.max(40,crs.sw+dx);
+    const th=colH[crs.c];if(th){th.style.width=nw+'px';th.style.minWidth=nw+'px';th.style.maxWidth=nw+'px'}
+},true);
+
+document.addEventListener('mouseup',()=>{
+    if(!crs.on)return;
+    crs.on=false;
+    document.querySelectorAll('.col-resize.active').forEach(e=>e.classList.remove('active'));
+    const sh=gs();if(!sh.colWidths)sh.colWidths={};
+    const th=colH[crs.c];if(th)sh.colWidths[crs.c]=parseInt(th.style.width);
+    save();
+},true);
+
+/* ========== INIT ========== */
+function init(){
+    if(!load()||!S.sheets.length){S.sheets=[createSample()];S.as=0}
+    buildGrid();reEval();refreshAll();updSel();updFB();updFmt();updStatus();renderTabs();
+    lucide.createIcons();
+}
+init();
+</script>
+</body>
+</html>
